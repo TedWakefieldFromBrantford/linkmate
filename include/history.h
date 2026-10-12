@@ -1,6 +1,9 @@
 #ifndef HISTORY_H
 #define HISTORY_H
 
-/* TODO: Declare history functions */
+void add_to_history(const char *url);
+char **get_history(void);
+int get_history_count(void);
+void clear_history(void);
 
 #endif /* HISTORY_H */

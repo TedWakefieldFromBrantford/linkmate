@@ -1,6 +1,6 @@
 #ifndef BROWSER_H
 #define BROWSER_H
 
-/* TODO: Declare browser functions */
+int open_url(const char *url);
 
 #endif /* BROWSER_H */

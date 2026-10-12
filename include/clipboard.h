@@ -1,6 +1,6 @@
 #ifndef CLIPBOARD_H
 #define CLIPBOARD_H
 
-/* TODO: Declare clipboard functions */
+int copy_to_clipboard(const char *text);
 
 #endif /* CLIPBOARD_H */
