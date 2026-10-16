@@ -1,0 +1,115 @@
+.TH LINKMATE 1 "2026-10-16" "linkmate 0.2.0" "User Commands"
+.SH NAME
+linkmate \- extract URLs from text and open one in a browser
+.SH SYNOPSIS
+.B linkmate
+[\fB\-\-pane\fR | \fB\-\-clip\fR] [\fIFILE\fR]
+.br
+.B linkmate
+\fB\-h\fR | \fB\-\-help\fR
+.br
+.B linkmate
+\fB\-V\fR | \fB\-\-version\fR
+.SH DESCRIPTION
+.B linkmate
+reads text from one of several sources, extracts URLs using a
+conservative URL\-character classifier, and presents them for
+selection.  If standard output is a terminal, an interactive
+selector is opened and a chosen URL is launched in the user's
+browser.  If standard output is not a terminal, a numbered list is
+printed to standard output and no browser is launched.
+.SH INPUT SOURCES
+Input is taken from the first available source in the following
+order:
+.IP "1." 4
+.B \-\-pane
+or
+.B \-\-clip
+if either is given.
+.IP "2." 4
+Standard input, if it is not a terminal.
+.IP "3." 4
+The first non\-option argument, interpreted as a file path.
+.PP
+If none applies,
+.B linkmate
+prints usage to standard error and exits with status 2.
+.PP
+Note that
+.BI "cmd | linkmate FILE"
+reads from standard input, not from
+.IR FILE .
+An explicit pipe takes precedence over a file argument.  This
+matches the behavior of most Unix filters.
+.SH OPTIONS
+.TP
+.B \-h, \-\-help
+Display usage information and exit.
+.TP
+.B \-V, \-\-version
+Display version information and exit.
+.TP
+.B \-\-pane
+Capture text from the current tmux pane and use it as input.
+Requires being inside a tmux session.
+.TP
+.B \-\-clip
+Read the system clipboard and use it as input.  Requires one of
+.BR wl\-paste (1),
+.BR xclip (1),
+or
+.BR xsel (1)
+to be installed.
+.SH ENVIRONMENT
+.TP
+.B BROWSER
+Program to launch for a selected URL.  If unset,
+.B linkmate
+tries
+.BR xdg\-open ,
+.BR open ,
+.BR firefox ,
+and
+.B chromium
+in order.
+.TP
+.B LINKMATE_BROWSER_LOG
+Path to a file where the browser's standard error is redirected.
+Defaults to
+.IR /tmp/lm\-browser.log .
+Override this if multiple users share a machine, or to send
+browser diagnostics somewhere you'll actually look.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.  URLs were found and either displayed or launched, or
+the user quit the interactive selector without selecting.
+.TP
+.B 1
+A runtime error occurred: an input source could not be read, or a
+file could not be opened.
+.TP
+.B 2
+Usage error: an unknown option was given, or no input source was
+available.
+.PP
+Note: "no URLs found" is not an error and exits 0.
+.SH EXAMPLES
+.TP
+.B tailscale status | linkmate
+Extract URLs from the output of
+.BR tailscale (1)
+and present them for selection.
+.TP
+.B linkmate README.md
+Extract URLs from a local file.
+.TP
+.B tmux capture\-pane \-p | linkmate
+Manually capture the current pane and pipe the result.  Equivalent
+to
+.BR \-\-pane .
+.SH "SEE ALSO"
+.BR xdg\-open (1),
+.BR tmux (1),
+.BR xclip (1),
+.BR wl\-paste (1)
