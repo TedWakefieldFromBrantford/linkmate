@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Ted Wakefield
+ */
+
 /* ============================================================================
  * terminal.h - Raw-mode terminal control.
  *

@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Ted Wakefield
+ */
+
 /* ============================================================================
  * browser.c - Launch URLs in the user's preferred browser.
  *

@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Ted Wakefield
+ */
+
 #ifndef URL_PARSER_H
 #define URL_PARSER_H
 

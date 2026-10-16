@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Ted Wakefield
+ */
+
 #include "../include/url_parser.h"
 #include <stdio.h>
 #include <stdlib.h>
