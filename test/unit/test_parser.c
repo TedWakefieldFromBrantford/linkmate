@@ -43,12 +43,15 @@ int test_url_parser(void) {
                      tests[i].expected_count, count);
         }
         
-        /* Check first URL if expected */
+        /* Check first URL if expected.  Bounded precision (%.100s) keeps
+         * the formatted message within error_msg's 256-byte budget and
+         * silences -Wformat-truncation, which fires when a %s argument
+         * could overflow the destination. */
         if (test_passed && tests[i].expected_first_url != NULL && count > 0) {
             if (strcmp(list.links[0].url, tests[i].expected_first_url) != 0) {
                 test_passed = 0;
                 snprintf(error_msg, sizeof(error_msg), 
-                         "Expected first URL '%s', got '%s'", 
+                         "Expected first URL '%.100s', got '%.100s'", 
                          tests[i].expected_first_url, list.links[0].url);
             }
         }
