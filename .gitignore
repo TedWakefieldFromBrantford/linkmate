@@ -1,3 +1,8 @@
 build/
 linkmate
 *.o
+test/unit/runner
+test/unit/runner.d
+*.d
+*.swp
+*~
