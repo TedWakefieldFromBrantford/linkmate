@@ -6,3 +6,4 @@ test/unit/runner.d
 *.d
 *.swp
 *~
+linkmate-*.tar.gz
