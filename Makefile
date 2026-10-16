@@ -2,8 +2,9 @@
 # LinkMate - Makefile
 # ============================================================================
 # Builds the linkmate binary and the test harness.  Supports debug and
-# release build modes, a check target for dependencies, and install /
-# uninstall with the usual PREFIX / DESTDIR conventions.
+# release build modes, a check target for dependencies, install/uninstall
+# with the usual PREFIX / DESTDIR conventions, and a dist target for
+# producing a versioned tarball.
 #
 # Variables users may override on the command line or from the
 # environment:
@@ -20,8 +21,10 @@ SHELL = /bin/bash
 # ----------------------------------------------------------------------------
 # Project
 # ----------------------------------------------------------------------------
-VERSION = 0.2.0
-TARGET  = linkmate
+VERSION   = 0.2.0
+TARGET    = linkmate
+DIST_NAME = $(TARGET)-$(VERSION)
+DIST_FILE = $(DIST_NAME).tar.gz
 
 # ----------------------------------------------------------------------------
 # Paths
@@ -67,12 +70,12 @@ override CFLAGS += -Wall -Wextra -Wpedantic -Wshadow \
                    -march=$(MARCH) \
                    -MMD -MP
 
-CFLAGS_DBG = -g3 -gdwarf-4 -O0 -DDEBUG \
-             -fno-omit-frame-pointer \
-             -fsanitize=address -fsanitize=undefined
+CFLAGS_DBG  = -g3 -gdwarf-4 -O0 -DDEBUG \
+              -fno-omit-frame-pointer \
+              -fsanitize=address -fsanitize=undefined
 LDFLAGS_DBG = -fsanitize=address -fsanitize=undefined
 
-CFLAGS_REL = -O3 -DNDEBUG -fomit-frame-pointer -flto
+CFLAGS_REL  = -O3 -DNDEBUG -fomit-frame-pointer -flto
 LDFLAGS_REL = -flto
 
 # ----------------------------------------------------------------------------
@@ -80,13 +83,13 @@ LDFLAGS_REL = -flto
 # ----------------------------------------------------------------------------
 BUILD_MODE ?= release
 ifeq ($(BUILD_MODE),debug)
-    CFLAGS  += $(CFLAGS_DBG)
-    LDFLAGS += $(LDFLAGS_DBG)
-    BUILD_SUBDIR = debug
+    CFLAGS       += $(CFLAGS_DBG)
+    LDFLAGS      += $(LDFLAGS_DBG)
+    BUILD_SUBDIR  = debug
 else
-    CFLAGS  += $(CFLAGS_REL)
-    LDFLAGS += $(LDFLAGS_REL)
-    BUILD_SUBDIR = release
+    CFLAGS       += $(CFLAGS_REL)
+    LDFLAGS      += $(LDFLAGS_REL)
+    BUILD_SUBDIR  = release
 endif
 
 # ----------------------------------------------------------------------------
@@ -114,7 +117,7 @@ COLOR_CYAN   = \033[36m
 # TARGETS
 # ============================================================================
 
-.PHONY: all clean distclean debug release \
+.PHONY: all clean distclean dist debug release \
         test test-raw test-parser test-terminal \
         install uninstall check help
 
@@ -158,7 +161,7 @@ $(TEST_HARNESS):
 		$(TEST_RUNNER) $(TEST_SRCS) \
 		src/browser.c \
 		src/terminal.c \
-		src/url_parser.c 
+		src/url_parser.c
 	@printf "$(COLOR_GREEN)   ✓ Test harness built$(COLOR_RESET)\n"
 
 test: build-dir $(TEST_HARNESS)
@@ -206,6 +209,24 @@ uninstall:
 	@printf "$(COLOR_GREEN)   ✓ Removed$(COLOR_RESET)\n"
 
 # ----------------------------------------------------------------------------
+# Distribution
+# ----------------------------------------------------------------------------
+dist: clean
+	@printf "$(COLOR_CYAN)📦 Building distribution tarball...$(COLOR_RESET)\n"
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		printf "$(COLOR_RED)✗ Working tree is not clean.$(COLOR_RESET)\n"; \
+		printf "  Commit or stash changes before running 'make dist'.\n"; \
+		exit 1; \
+	fi
+	git archive \
+		--format=tar.gz \
+		--prefix=$(DIST_NAME)/ \
+		-o $(DIST_FILE) \
+		HEAD
+	@printf "$(COLOR_GREEN)   ✓ $(DIST_FILE) ($$(du -h $(DIST_FILE) | cut -f1))$(COLOR_RESET)\n"
+	@printf "$(COLOR_GREEN)✅ Distribution tarball created$(COLOR_RESET)\n"
+
+# ----------------------------------------------------------------------------
 # Clean
 # ----------------------------------------------------------------------------
 clean:
@@ -216,7 +237,9 @@ clean:
 	@printf "$(COLOR_GREEN)   ✓ Cleaned$(COLOR_RESET)\n"
 
 distclean: clean
-	@printf "$(COLOR_YELLOW)🧹 Cleaned$(COLOR_RESET)\n"
+	@printf "$(COLOR_YELLOW)🧹 Cleaning distribution files...$(COLOR_RESET)\n"
+	rm -f $(DIST_FILE)
+	@printf "$(COLOR_GREEN)   ✓ $(DIST_FILE) removed$(COLOR_RESET)\n"
 
 # ----------------------------------------------------------------------------
 # Help
@@ -234,8 +257,9 @@ help:
 	@printf "  check         Check dependencies\n"
 	@printf "  install       Install to \$$(PREFIX)\n"
 	@printf "  uninstall     Remove from \$$(PREFIX)\n"
+	@printf "  dist          Create distribution tarball\n"
 	@printf "  clean         Remove build files\n"
-	@printf "  distclean     Alias for clean (reserved for future use)\n"
+	@printf "  distclean     Remove build files and distribution tarball\n"
 	@printf "  help          Show this help\n"
 	@printf "\n"
 	@printf "$(COLOR_YELLOW)Variables:$(COLOR_RESET)\n"
@@ -246,10 +270,12 @@ help:
 	@printf "  CFLAGS   Additional compiler flags\n"
 	@printf "\n"
 	@printf "$(COLOR_YELLOW)Examples:$(COLOR_RESET)\n"
-	@printf "  make                                    # release build\n"
-	@printf "  make debug                              # debug build\n"
-	@printf "  make MARCH=native                       # tune for this CPU\n"
-	@printf "  make install                            # install to /usr/local\n"
-	@printf "  make install PREFIX=\$$HOME/.local       # install to home\n"
+	@printf "  make                                         # release build\n"
+	@printf "  make debug                                   # debug build\n"
+	@printf "  make MARCH=native                            # tune for this CPU\n"
+	@printf "  make test                                    # run tests\n"
+	@printf "  make dist                                    # create tarball\n"
+	@printf "  make install                                 # install to /usr/local\n"
+	@printf "  make install PREFIX=\$$HOME/.local            # install to home\n"
 	@printf "  make install DESTDIR=/tmp/stage PREFIX=/usr  # staged install\n"
-	@printf "  make uninstall PREFIX=\$$HOME/.local    # remove from home\n"
+	@printf "  make uninstall PREFIX=\$$HOME/.local         # remove from home\n"
