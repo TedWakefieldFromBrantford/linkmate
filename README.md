@@ -13,17 +13,15 @@ shell didn't wrap it at a bad column.
 
 ## The solution
 
-LinkMate - 5 URL(s) found
-===================================================
- > https://github.com/tedstuff/linkmate/releases
-   https://keepachangelog.com
-   https://semver.org
-   https://httpbin.org/get
-   https://example.com
+    LinkMate - 5 URL(s) found
+    ===================================================
+     > https://github.com/tedstuff/linkmate/releases
+       https://keepachangelog.com
+       https://semver.org
+       https://httpbin.org/get
+       https://example.com
 
-[up/down] move   [Enter] open   [q] quit
-
-
+    [up/down] move   [Enter] open   [q] quit
 
 Arrow keys select, Enter opens the highlighted URL in your browser,
 `q` quits. The TUI runs on the alternate screen buffer, so your
@@ -33,37 +31,28 @@ Duplicate URLs in the input are silently deduplicated; the same URL
 appearing twice (for example, as both an `href` and visible link
 text) appears once in the list.
 
-
 ## Install
 
 From source:
 
-git clone https://github.com/tedstuff/linkmate
-cd linkmate
-make
-sudo make install
-
-
+    git clone https://github.com/tedstuff/linkmate
+    cd linkmate
+    make
+    sudo make install
 
 Requires a C99 compiler and `make`. No external dependencies.
 
 To install somewhere other than `/usr/local`:
 
-make install PREFIX=$HOME/.local
-
-
+    make install PREFIX=$HOME/.local
 
 To stage an install for packaging:
 
-make install DESTDIR=/tmp/stage PREFIX=/usr
-
-
+    make install DESTDIR=/tmp/stage PREFIX=/usr
 
 To uninstall:
 
-sudo make uninstall
-
-
+    sudo make uninstall
 
 ## Usage
 
@@ -79,18 +68,14 @@ If stdout is a terminal, the interactive selector opens. If it isn't
 (when piping to another command, or redirecting to a file), linkmate
 prints a numbered list and exits:
 
-$ cat README.md | linkmate
-✅ Found 3 URL(s):
-─────────────────────────────────────
-
-    https://github.com/tedstuff/linkmate
-
-    https://keepachangelog.com/
-
-    https://semver.org/
-
-
-
+    $ cat test/data/demo.md | linkmate
+    Found 5 URL(s):
+    -------------------------------------
+      1. https://github.com/tedstuff/linkmate/releases
+      2. https://keepachangelog.com
+      3. https://semver.org
+      4. https://httpbin.org/get
+      5. https://example.com
 
 In the TUI:
 
@@ -140,23 +125,19 @@ enough to understand in an afternoon.
 
 ## Building
 
-make # release build
-make debug # debug build with sanitizers
-make test # run all tests
-make dist # create linkmate-$(VERSION).tar.gz
-make distclean # remove all build artifacts
-make help # list targets and variables
-
-
+    make            # release build
+    make debug      # debug build with sanitizers
+    make test       # run all tests
+    make dist       # create linkmate-$(VERSION).tar.gz
+    make distclean  # remove all build artifacts
+    make help       # list targets and variables
 
 Build variables you can override:
 
-make CC=clang # use a different compiler
-make MARCH=native # tune for this CPU (default: x86-64-v3)
-make CFLAGS="-O0 -g" # override base flags; warnings stay on
-make BUILD_MODE=debug # same as make debug
-
-
+    make CC=clang                 # use a different compiler
+    make MARCH=native             # tune for this CPU (default: x86-64-v3)
+    make CFLAGS="-O0 -g"          # override base flags; warnings stay on
+    make BUILD_MODE=debug         # same as `make debug`
 
 ## License
 
