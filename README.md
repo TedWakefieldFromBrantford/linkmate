@@ -1,4 +1,3 @@
-
 # linkmate
 
 Extract URLs from text and open one in your browser.
