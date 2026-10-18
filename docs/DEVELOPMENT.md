@@ -269,6 +269,40 @@ maximum compatibility with `make MARCH=x86-64-v2`.
 **Default to the lowest common denominator; let users opt into maximum
 performance.**
 
+### Why the URL parser deduplicates
+
+The same URL often appears multiple times in HTML input — once as an
+`href` and once as visible link text, or as a repeated reference in a
+sidebar.  Duplicates in the selector are user-hostile: they make the
+list look longer than it is and force arrow-key presses that do
+nothing useful.
+
+Deduplication uses a `StrSet` (see `src/strset.c`): an open-addressing
+hash table with FNV-1a hashing and linear probing.  Every extracted
+URL is checked against the set before being added to the result list.
+If it's already present, the URL is silently skipped.
+
+The design tradeoff:
+- **Open addressing** over chaining: single allocation, cache-friendly,
+  no per-entry `malloc`.
+- **FNV-1a** over a cryptographic hash: fast for short strings, good
+  distribution, no dependency on OpenSSL or libsodium.
+- **`strdup` on insert**: the set owns its strings, so the caller's
+  input buffer can be freed after parsing without dangling pointers.
+
+Deduplication is best-effort: if `strset_create()` fails (out of
+memory), the parser proceeds without it, accepting duplicates rather
+than dropping URLs.  For a tool whose output is "open this URL in a
+browser," a duplicate is a cosmetic annoyance; a dropped URL is a
+missing result.
+
+Exact byte comparison only: `https://example.com` and
+`https://example.com/` are treated as distinct.  Normalizing URLs
+(trailing slashes, host case, port defaults) is a rabbit hole that
+doesn't pay off for this use case — a user who sees both variants
+in the list can pick whichever opens.
+
+
 ---
 
 ## Environment gotchas
@@ -454,3 +488,9 @@ Two candidates were considered and rejected:
 Both are the kind of feature that seems harmless and is not.
 "Small" is not the absence of effort — it's a decision that must be
 made repeatedly, against the pull of every plausible-sounding feature.
+
+
+# To do:
+
+SIGWINCH handler for mid-sesh window resizing (?)
+
