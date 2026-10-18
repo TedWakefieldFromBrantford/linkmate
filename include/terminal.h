@@ -53,6 +53,37 @@ void disable_raw_mode(void);
  * Translates CR (13) to KEY_ENTER so callers see a single newline value. */
 int  read_key(int fd);
 
+/*------------------------------------------------------------------------
+* Alternate screen buffer.
+* 
+* The alternate screen is a separate 'screen' maintained by the terminal.
+* Drawing on it does not pollute the user's scrollback; and leaving it
+* restores the screen exactly as it was. This is what vim, less, and tmux do.
+*
+* The sequences are xterm-compatible and universally supported. If a
+* terminal doesn't support them, the escapes are ignored and we fall back 
+* to drawing on the normal screen.
+*
+*-------------------------------------------------------------------------*/
+void enter_alternate_screen(void);
+void drain_input(int fd);
+void leave_alternate_screen(void);
+
+/*-------------------------------------------------------------------------
+* Cursor movement and clearing.
+*
+* These are the primitives the TUI uses to redraw in place without
+* clearing. cursor_home() moves to the top-left without erasing; 
+* clear_to_end() erases from the cursor position to the bottom of the screen.
+* Used together, they let the TUI draw a new frame over an old one with no
+* flash.
+*
+*-------------------------------------------------------------------------*/
+void cursor_home(void);
+void clear_to_end(void);
+
+
+
 /* Output helpers - all write to stdout. */
 void clear_screen(void);
 void move_cursor(int row, int col);

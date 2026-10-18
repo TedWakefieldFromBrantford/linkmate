@@ -40,6 +40,11 @@
  *   - Subprocess-based input sources (tmux, clipboard) shell out to
  *     existing tools rather than linking libraries.  This keeps the
  *     build simple and the failure modes observable.
+ *   - All output is plain ASCII plus a few widely-supported Unicode
+ *     box-drawing and punctuation characters.  No emoji: terminal
+ *     rendering of multi-codepoint emoji (especially ZWJ sequences)
+ *     varies enough to corrupt cursor arithmetic on some terminals,
+ *     and a TUI cannot afford a corrupted cursor.
  * ============================================================================*/
 
 #include "../include/browser.h"
@@ -107,7 +112,7 @@ static char *read_stdin(void) {
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) {
-        fprintf(stderr, "❌ Cannot open %s: %s\n", path, strerror(errno));
+        fprintf(stderr, "Cannot open %s: %s\n", path, strerror(errno));
         return NULL;
     }
 
@@ -229,7 +234,7 @@ static char *capture_tmux_pane(void) {
     char *text = run_and_capture(tmux_argv);
     if (!text) {
         fprintf(stderr,
-            "❌ --pane: failed to capture from tmux.\n"
+            "--pane: failed to capture from tmux.\n"
             "   Are you inside a tmux session?\n");
     }
     return text;
@@ -267,7 +272,7 @@ static char *capture_clipboard(void) {
     char *const *cargv = clipboard_argv();
     if (!cargv) {
         fprintf(stderr,
-            "❌ --clip: no clipboard tool found.\n"
+            "--clip: no clipboard tool found.\n"
             "   Install xclip, xsel, or wl-clipboard.\n");
         return NULL;
     }
@@ -275,7 +280,7 @@ static char *capture_clipboard(void) {
     char *text = run_and_capture((char *const *)cargv);
     if (!text) {
         fprintf(stderr,
-            "❌ --clip: clipboard is empty or unreadable.\n"
+            "--clip: clipboard is empty or unreadable.\n"
             "   Did you copy something first? (Ctrl+Shift+C)\n");
     }
     return text;
@@ -307,10 +312,11 @@ static void usage(FILE *out) {
         "Options:\n"
         "  -h, --help         display this help and exit\n"
         "  -V, --version      display version information and exit\n"
-        "\n"    
+        "\n"
         "Output:\n"
         "  If stdout is a terminal, opens an interactive selector.\n"
         "  Otherwise, prints a numbered URL list to stdout.\n"
+        "\n"
         "Examples:\n"
         "  tailscale status | linkmate\n"
         "  linkmate --pane\n"
@@ -323,7 +329,7 @@ static void usage(FILE *out) {
         "  LINKMATE_BROWSER_LOG  path to log browser stderr\n"
         "                     (default: /tmp/lm-browser.log)\n"
         "\n"
-        "  Full documentation: man linkmate\n");
+        "Full documentation: man linkmate\n");
 }
 
 /* ============================================================================
@@ -337,12 +343,12 @@ static void usage(FILE *out) {
  * ---------------------------------------------------------------------------*/
 static void print_url_list(const LinkList *urls) {
     if (urls->count == 0) {
-        printf("😴 No URLs found in input.\n");
+        printf("No URLs found in input.\n");
         return;
     }
 
-    printf("\n✅ Found %zu URL(s):\n", urls->count);
-    printf("─────────────────────────────────────\n");
+    printf("\nFound %zu URL(s):\n", urls->count);
+    printf("-------------------------------------\n");
     for (size_t i = 0; i < urls->count; i++) {
         printf("  %zu. %s\n", i + 1, urls->links[i].url);
     }
@@ -378,9 +384,18 @@ static int open_keyboard_input(int *was_opened) {
 /* ---------------------------------------------------------------------------
  * run_selector() - Interactive TUI.
  *
- * Full redraw each iteration: simple and correct.  A smarter version
- * would repaint only changed rows; not worth the complexity until we
- * notice flicker on slow terminals.
+ * Full redraw each iteration, into the alternate screen buffer.  The list
+ * is drawn through a viewport sized to the terminal; the viewport scrolls
+ * when the selection moves past the visible window.
+ *
+ * Layout (H = terminal height):
+ *   row 1:       header   "LinkMate - N URL(s) found"
+ *   row 2:       rule
+ *   rows 3..H-3: items    (up to H-5 items)
+ *   row H-2:     blank
+ *   row H-1:     footer   "[up/down] move   [Enter] open   [q] quit"
+ *   row H:       cursor   (empty; leaves headroom so trailing newline
+ *                         never pushes us to H+1 and triggers a scroll)
  *
  * Returns 1 if the user opened a URL, 0 if they quit.
  * ---------------------------------------------------------------------------*/
@@ -390,38 +405,75 @@ static int run_selector(LinkList *urls) {
     int was_opened = 0;
     int input_fd   = open_keyboard_input(&was_opened);
     if (input_fd < 0) {
-        fprintf(stderr, "❌ No terminal available for interactive mode\n");
+        fprintf(stderr, "No terminal available for interactive mode\n");
         return 0;
     }
 
     if (enable_raw_mode(input_fd) == -1) {
-        fprintf(stderr, "❌ Failed to enter raw mode: %s\n", strerror(errno));
+        fprintf(stderr, "Failed to enter raw mode: %s\n", strerror(errno));
         if (was_opened) close(input_fd);
         return 0;
     }
-    hide_cursor();
 
-    int selected = 0;
-    int opened   = 0;
-    int running  = 1;
+    /* Get terminal height once.  If it resizes mid-session, the frame
+     * will be wrong until the next redraw; SIGWINCH handling is a
+     * future refinement. */
+    int term_rows, term_cols;
+    get_terminal_size(&term_rows, &term_cols);
+
+    /* Reserve: 1 header + 1 rule + 1 blank + 1 footer + 1 headroom
+     * row for the cursor (so the trailing newline after the footer
+     * doesn't push us to row H+1 and trigger a scroll). */
+    int viewport_height = term_rows - 5;
+    if (viewport_height < 1) viewport_height = 1;
+
+    enter_alternate_screen();
+    hide_cursor();
+    drain_input(input_fd);
+
+    int selected     = 0;
+    int viewport_top = 0;
+    int opened       = 0;
+    int running      = 1;
 
     while (running) {
-        clear_screen();
-        move_cursor(1, 1);
+        /* Keep the selection inside the viewport. */
+        if (selected < viewport_top) {
+            viewport_top = selected;
+        }
+        if (selected >= viewport_top + viewport_height) {
+            viewport_top = selected - viewport_height + 1;
+        }
+        /* Don't let viewport_top go past the end of the list. */
+        if (viewport_top < 0) {
+            viewport_top = 0;
+        }
+        if (viewport_top + viewport_height > (int)urls->count) {
+            viewport_top = (int)urls->count - viewport_height;
+            if (viewport_top < 0) viewport_top = 0;
+        }
 
-        printf("🧑‍🤝‍🧑 LinkMate — %zu URL(s) found\r\n", urls->count);
-        printf("═══════════════════════════════════════════════════\r\n");
+        cursor_home();
 
-        for (size_t i = 0; i < urls->count; i++) {
-            if ((int)i == selected) {
-                printf("\033[7m ▶ %s\033[0m\r\n", urls->links[i].url);
+        printf("LinkMate - %zu URL(s) found\r\n", urls->count);
+        printf("===================================================\r\n");
+
+        int viewport_end = viewport_top + viewport_height;
+        if (viewport_end > (int)urls->count) {
+            viewport_end = (int)urls->count;
+        }
+
+        for (int i = viewport_top; i < viewport_end; i++) {
+            if (i == selected) {
+                printf("\033[7m > %s\033[0m\r\n", urls->links[i].url);
             } else {
                 printf("   %s\r\n", urls->links[i].url);
             }
         }
 
         printf("\r\n");
-        printf("[↑/↓] move   [Enter] open   [q] quit\r\n");
+        printf("[up/down] move   [Enter] open   [q] quit\r\n");
+        clear_to_end();
         fflush(stdout);
 
         int key = read_key(input_fd);
@@ -436,13 +488,6 @@ static int run_selector(LinkList *urls) {
                 break;
 
             case KEY_ENTER:
-                /* Leave raw mode BEFORE opening so the browser is not
-                 * competing with us for the TTY. */
-                disable_raw_mode();
-                show_cursor();
-                clear_screen();
-                printf("🌐 Opening: %s\n", urls->links[selected].url);
-                open_url(urls->links[selected].url);
                 opened  = 1;
                 running = 0;
                 break;
@@ -458,12 +503,17 @@ static int run_selector(LinkList *urls) {
         }
     }
 
-    /* Always restore the terminal, no matter how the loop exited.
-     * disable_raw_mode() is idempotent, so calling it here even if
-     * the Enter branch already called it is fine. */
+    /* Restore the screen first, then raw mode.  The alternate-screen
+     * escape must reach the terminal while we're still drawing to it;
+     * the "Opening:" message then appears on the normal screen. */
+    leave_alternate_screen();
     disable_raw_mode();
     show_cursor();
-    clear_screen();
+
+    if (opened) {
+        printf("Opening: %s\n", urls->links[selected].url);
+        open_url(urls->links[selected].url);
+    }
 
     if (was_opened) close(input_fd);
     return opened;
@@ -471,29 +521,31 @@ static int run_selector(LinkList *urls) {
 
 /* ============================================================================
  * ARGUMENT PARSING
- * ============================================================================
-*------------------------------------------------------------------------------
-* parse_args() - Handle flags that terminate the program.
+ * ============================================================================*/
 
-* This function is deliberately separate from aquire_input() because the flags
-* here have a different lifetime:  They are informational and program ends the
-* moment one is seen.  They never touch inout, the TUI, or the browser.
-*
-* aquire_input owns the other class opf flags which identify the source and feed * the rest of the pipline.  MIxing the two in one loop would require scanning 
-* argv twice anyway (once to check for early exit flags and once to find the
-* source), so I have seperated the concerns for readability.
-*
-*  On --help or --version:  print and exit 0
-*  On unknown flag, print diagnostic and exit 2
-*  Otherwise, return normally.
-*
-------------------------------------------------------------------------------*/
-
+/* ---------------------------------------------------------------------------
+ * parse_args() - Handle flags that terminate the program.
+ *
+ * This function is deliberately separate from acquire_input() because the
+ * flags here have a different lifetime: they are *informational*, and the
+ * program ends the moment one is seen.  They never touch input, never
+ * touch the TUI, never touch the browser.
+ *
+ * acquire_input() owns the other class of flags -- --pane and --clip --
+ * which *choose a source* and feed the rest of the pipeline.  Mixing the
+ * two into one loop would require scanning argv twice anyway (once to
+ * check for early-exit flags, once to find the source), so we keep the
+ * two concerns in two functions where each is easy to read.
+ *
+ * On --help or --version: prints and exits 0.
+ * On unknown flag: prints a diagnostic and exits 2.
+ * Otherwise: returns normally.
+ * ---------------------------------------------------------------------------*/
 static void parse_args(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
 
-        /* Informational flags:  Print and exit*/
+        /* --- Informational flags: print and exit. --- */
         if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
             usage(stdout);
             exit(0);
@@ -503,23 +555,25 @@ static void parse_args(int argc, char **argv) {
             exit(0);
         }
 
-        /* --- Source flags:  known to parse_args, handled in aquire_input. */
+        /* --- Source flags: known to parse_args, handled in acquire_input. --- */
         if (strcmp(arg, "--pane") == 0) continue;
         if (strcmp(arg, "--clip") == 0) continue;
 
-        /*  Anything else starting with '-' is uinknown.*/
+        /* --- Anything else starting with '-' is unknown. --- */
         if (arg[0] == '-') {
             fprintf(stderr, "linkmate: unknown option '%s'\n", arg);
             fprintf(stderr, "Try 'linkmate --help' for more information.\n");
             exit(2);
         }
 
-        /*  Non flag arg:  it's a file path and not our business here*/
+        /* --- Non-flag argument: it's a file path.  Not our business. --- */
     }
 }
+
 /* ============================================================================
  * DISPATCH
  * ============================================================================*/
+
 /* ---------------------------------------------------------------------------
  * acquire_input() - Get input text from wherever the user said it is.
  *
@@ -545,11 +599,13 @@ static char *acquire_input(int argc, char **argv) {
         return read_stdin();
     }
 
-    /* --- 3. File argument.  Scan argv for a non-flag string. --- */
+    /* --- 3. File argument.  parse_args() has already rejected any
+     *        flag we don't recognize, so a leading '-' here would be
+     *        impossible; the loop just returns the first non-flag. --- */
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
             return read_file(argv[i]);
-        }    
+        }
     }
 
     /* --- 4. Nothing to do. --- */
@@ -563,6 +619,7 @@ static char *acquire_input(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     parse_args(argc, argv);
+
     char *input_text = acquire_input(argc, argv);
     if (!input_text) return 1;
 

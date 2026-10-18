@@ -115,6 +115,50 @@ int read_key(int fd) {
     return 0;
 }
 
+/*---------------------------------------------------------------------------
+* Alternate screen buffer.
+*
+----------------------------------------------------------------------------*/
+
+void enter_alternate_screen(void) {
+     /* Enter the alternate screen, reset any inherited scroll region,
+     * and home the cursor.  The scroll-region reset is essential:
+     * some terminals retain a scroll region across the alternate-screen
+     * switch, in which case \033[H would land at the top of the stale
+     * region rather than the top of the screen. */
+    printf("\033>"); 
+    printf("\033[?1049h");
+    printf("\033[H");
+    fflush(stdout);
+}
+void leave_alternate_screen(void) {
+    printf("\033[?1049l");
+    fflush(stdout);
+}
+void drain_input(int fd) {
+    /* Discard any pending input on the terminal.  Otherwise a stale
+     * byte from before the TUI started (shell-buffered newline, mouse
+     * event, previous program's leftover) can be read as the user's
+     * first keypress and prematurely exit the selector. */
+    tcflush(fd, TCIFLUSH);
+}
+
+/*---------------------------------------------------------------------------
+* In-place redraw primitives.
+* 
+-----------------------------------------------------------------------------*/
+
+void cursor_home(void) {
+    printf("\033[1;1H");
+    fflush(stdout);
+}
+
+void clear_to_end(void) {
+    printf("\033[J");
+    fflush(stdout);
+}
+
+
 /* ---------------------------------------------------------------------------
  * Output helpers.
  * ---------------------------------------------------------------------------*/
