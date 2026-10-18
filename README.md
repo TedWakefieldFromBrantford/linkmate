@@ -15,17 +15,16 @@ shell didn't wrap it at a bad column.
 
 ## The solution
 
-$ linkmate test/data/demo.md
-🧑‍🤝‍🧑 LinkMate — 5 URL(s) found
-═══════════════════════════════════════════════════
-▶ https://www.kernel.org/doc/man-pages/
-https://www.gnu.org/software/make/manual/
-https://keepachangelog.com/
-https://semver.org/
-https://github.com/tedstuff/linkmate
+LinkMate - 5 URL(s) found
+===================================================
+ > https://github.com/tedstuff/linkmate/releases
+   https://keepachangelog.com
+   https://semver.org
+   https://httpbin.org/get
+   https://example.com
 
-[↑/↓] move [Enter] open [q] quit
-text
+[up/down] move   [Enter] open   [q] quit
+
 
 
 Arrow keys select, Enter opens the highlighted URL in your browser,
@@ -45,7 +44,7 @@ git clone https://github.com/tedstuff/linkmate
 cd linkmate
 make
 sudo make install
-text
+
 
 
 Requires a C99 compiler and `make`. No external dependencies.
@@ -53,31 +52,30 @@ Requires a C99 compiler and `make`. No external dependencies.
 To install somewhere other than `/usr/local`:
 
 make install PREFIX=$HOME/.local
-text
+
 
 
 To stage an install for packaging:
 
 make install DESTDIR=/tmp/stage PREFIX=/usr
-text
+
 
 
 To uninstall:
 
 sudo make uninstall
-text
+
 
 
 ## Usage
 
 Four input sources. The first one that applies wins.
 
-tailscale status | linkmate # pipe
-linkmate README.md # file
-linkmate --pane # tmux pane
-linkmate --clip # system clipboard
-text
-
+    git log --oneline -50 | linkmate    # URLs from recent commit messages
+    curl -s <url> | linkmate            # URLs from a web page
+    linkmate README.md                  # URLs from a file
+    linkmate --pane                     # URLs from the current tmux pane
+    linkmate --clip                     # URLs from the system clipboard
 
 If stdout is a terminal, the interactive selector opens. If it isn't
 (when piping to another command, or redirecting to a file), linkmate
@@ -93,7 +91,7 @@ $ cat README.md | linkmate
 
     https://semver.org/
 
-text
+
 
 
 In the TUI:
@@ -150,7 +148,7 @@ make test # run all tests
 make dist # create linkmate-$(VERSION).tar.gz
 make distclean # remove all build artifacts
 make help # list targets and variables
-text
+
 
 
 Build variables you can override:
@@ -159,7 +157,7 @@ make CC=clang # use a different compiler
 make MARCH=native # tune for this CPU (default: x86-64-v3)
 make CFLAGS="-O0 -g" # override base flags; warnings stay on
 make BUILD_MODE=debug # same as make debug
-text
+
 
 
 ## License
