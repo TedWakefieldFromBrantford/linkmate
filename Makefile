@@ -161,7 +161,9 @@ $(TEST_HARNESS):
 		$(TEST_RUNNER) $(TEST_SRCS) \
 		src/browser.c \
 		src/terminal.c \
-		src/url_parser.c
+		src/url_parser.c \
+        src/strset.c
+        
 	@printf "$(COLOR_GREEN)   ✓ Test harness built$(COLOR_RESET)\n"
 
 test: build-dir $(TEST_HARNESS)

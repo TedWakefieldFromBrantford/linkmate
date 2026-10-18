@@ -6,6 +6,7 @@
 
 /* Forward declarations - ONLY active tests */
 int test_raw_mode(void);
+int test_strset(void);
 int test_url_parser(void);
 int test_terminal_functions(void);
 
@@ -117,7 +118,9 @@ int main(int argc, char **argv) {
             list_tests();
             return 0;
         }
-        
+        if (strcmp(argv[i], "strset") == 0) {
+            return test_strset();
+        }
         if (strcmp(argv[i], "raw-mode") == 0) {
             return test_raw_mode();
         }
