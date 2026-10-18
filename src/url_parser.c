@@ -3,6 +3,7 @@
  */
 
 #include "../include/url_parser.h"
+#include "../include/strset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,6 +77,11 @@ int get_urls_from_text(const char *source_text, LinkList *url_container) {
         return 0;
     }
 
+    /* Dedup set.  If allocation fails we fall back to no deduplication
+     * rather than failing the whole parse -- duplicates are cosmetic,
+     * not a correctness issue for the caller. */
+    StrSet *seen = strset_create();
+
     int urls_found = 0;
 
     for (int term_index = 0; term_index < total_search_terms; term_index++) {
@@ -115,6 +121,34 @@ int get_urls_from_text(const char *source_text, LinkList *url_container) {
 
             size_t url_len = (size_t)(url_end - url_start);
 
+            /* Build the URL into a local buffer first, so we can check
+             * the dedup set before committing a slot in the container. */
+            char url_buf[MAX_URL_LENGTH];
+
+            if (is_www) {
+                int written = snprintf(url_buf, sizeof url_buf,
+                                       "http://%.*s", (int)url_len, url_start);
+                if (written < 0 || (size_t)written >= sizeof url_buf) {
+                    scan_spot = url_end;
+                    continue;
+                }
+            } else {
+                size_t copy_len = url_len;
+                if (copy_len >= MAX_URL_LENGTH) {
+                    copy_len = MAX_URL_LENGTH - 1;
+                }
+                memcpy(url_buf, url_start, copy_len);
+                url_buf[copy_len] = STOP_BYTE;
+            }
+
+            /* Deduplication: skip if we've already seen this exact string.
+             * If the set allocation failed, seen is NULL and we skip the
+             * check (accepting duplicates rather than dropping URLs). */
+            if (seen && !strset_add(seen, url_buf)) {
+                scan_spot = url_end;
+                continue;
+            }
+
             /* Grow container if needed */
             if (url_container->count >= url_container->capacity) {
                 size_t new_capacity = url_container->capacity * 2;
@@ -127,20 +161,7 @@ int get_urls_from_text(const char *source_text, LinkList *url_container) {
 
             Link *current_url = &url_container->links[url_container->count];
 
-            if (is_www) {
-                /* Prepend http:// to bare www. */
-                int written = snprintf(current_url->url, MAX_URL_LENGTH,
-                                       "http://%.*s", (int)url_len, url_start);
-                if (written < 0) { scan_spot = url_end; continue; }
-            } else {
-                size_t copy_len = url_len;
-                if (copy_len >= MAX_URL_LENGTH) {
-                    copy_len = MAX_URL_LENGTH - 1;
-                }
-                memcpy(current_url->url, url_start, copy_len);
-                current_url->url[copy_len] = STOP_BYTE;
-            }
-
+            memcpy(current_url->url, url_buf, strlen(url_buf) + 1);
             current_url->line_number  = 0;
             current_url->start_column = (int)(url_start - source_text);
             current_url->end_column   = (int)(url_end   - source_text);
@@ -152,9 +173,9 @@ int get_urls_from_text(const char *source_text, LinkList *url_container) {
         }
     }
 
+    strset_free(seen);
     return urls_found;
 }
-
 void free_url_list(LinkList *url_container) {
     if (url_container && url_container->links) {
         free(url_container->links);
