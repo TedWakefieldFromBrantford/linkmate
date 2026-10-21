@@ -4,9 +4,7 @@ Extract URLs from text and open one in your browser.
 
 ## The problem
 
-You're staring at a URL in your terminal. Maybe it's a download link in
-a build log, an endpoint in a `curl` response, or a reference in a
-README you just cat'd. The URL is right there — you can see it — and
+You're staring at a URL in your terminal.
 getting it into your browser means selecting it (if the terminal
 allows), copying it, switching windows, pasting it, and hoping the
 shell didn't wrap it at a bad column.
@@ -114,8 +112,7 @@ does not:
   (`BROWSER`) is already an environment variable.
 - **Do anything but launch one browser per invocation.**
 
-These are decisions, not gaps. A tool that does one thing stays small
-enough to understand in an afternoon.
+These are decisions.
 
 ## Documentation
 
